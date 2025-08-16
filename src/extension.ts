@@ -4,7 +4,7 @@ export function activate(context: vscode.ExtensionContext) {
     console.log('File Explorer Expand All extension is now active!');
 
     // コマンドを登録（複数のURIを受け取れるように修正）
-    let disposable = vscode.commands.registerCommand('fileExplorer.expandAll', async (uri?: vscode.Uri, selectedUris?: vscode.Uri[]) => {
+    let disposable = vscode.commands.registerCommand('fileExplorer.expandRecursively', async (uri?: vscode.Uri, selectedUris?: vscode.Uri[]) => {
         await expandAllFolders(uri, selectedUris);
     });
 

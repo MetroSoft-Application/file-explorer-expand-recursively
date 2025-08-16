@@ -1,21 +1,37 @@
 {
-  "name": "file-explorer-expand-all",
-  "displayName": "File Explorer Expand All",
-  "description": "Recursively expand all folder nodes in VS Code file explorer",
+  "name": "file-explorer-expand-recursively",
+  "displayName": "File Explorer Expand Recursively",
+  "description": "Recursively expand folder nodes in VS Code file explorer",
   "version": "1.0.0",
+  "icon": "resources/icon.png",
   "engines": {
     "vscode": "^1.74.0"
   },
+  "repository": {
+    "url": "https://github.com/MetroSoft-Application/file-explorer-expand-recursively"
+  },
   "categories": [
     "Other"
+  ],
+  "keywords": [
+    "file explorer",
+    "expand",
+    "recursive",
+    "folder",
+    "tree",
+    "navigation",
+    "expand all",
+    "file tree",
+    "workspace",
+    "directory"
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "fileExplorer.expandAll",
-        "title": "Expand All Folders Recursively",
+        "command": "fileExplorer.expandRecursively",
+        "title": "Expand Recursively",
         "icon": "$(expand-all)"
       },
       {
@@ -36,14 +52,14 @@
     "menus": {
       "explorer/context": [
         {
-          "command": "fileExplorer.expandAll",
+          "command": "fileExplorer.expandRecursively",
           "when": "explorerResourceIsFolder",
           "group": "navigation"
         }
       ],
       "commandPalette": [
         {
-          "command": "fileExplorer.expandAll"
+          "command": "fileExplorer.expandRecursively"
         },
         {
           "command": "fileExplorer.showExpandedView"
