@@ -3,9 +3,9 @@ import * as vscode from 'vscode';
 export function activate(context: vscode.ExtensionContext) {
     console.log('File Explorer Expand All extension is now active!');
 
-    // コマンドを登録
-    let disposable = vscode.commands.registerCommand('fileExplorer.expandAll', async () => {
-        await expandAllFolders();
+    // コマンドを登録（引数を受け取れるように修正）
+    let disposable = vscode.commands.registerCommand('fileExplorer.expandAll', async (uri?: vscode.Uri) => {
+        await expandAllFolders(uri);
     });
 
     context.subscriptions.push(disposable);
@@ -13,63 +13,71 @@ export function activate(context: vscode.ExtensionContext) {
 
 /**
  * すべてのフォルダを再帰的に展開する関数
+ * @param targetUri 右クリックされたフォルダのURI（指定されない場合はワークスペース全体）
  */
-async function expandAllFolders() {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
-        vscode.window.showInformationMessage('No workspace folder is open.');
-        return;
-    }
-
+async function expandAllFolders(targetUri?: vscode.Uri) {
     try {
         // まずエクスプローラーにフォーカス
         await vscode.commands.executeCommand('workbench.files.action.focusFilesExplorer');
         await new Promise(resolve => setTimeout(resolve, 200));
 
-        // ワークスペースルートを選択
-        await vscode.commands.executeCommand('list.selectAll');
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // 対象フォルダを決定
+        let foldersToExpand: vscode.Uri[] = [];
+
+        if (targetUri) {
+            // 右クリックされたフォルダが指定された場合
+            const stat = await vscode.workspace.fs.stat(targetUri);
+            if (stat.type === vscode.FileType.Directory) {
+                foldersToExpand = [targetUri];
+                vscode.window.showInformationMessage(`Expanding folder: ${vscode.workspace.asRelativePath(targetUri)}`);
+            } else {
+                vscode.window.showErrorMessage('Selected item is not a folder.');
+                return;
+            }
+        } else {
+            // コマンドパレットから実行された場合はワークスペース全体
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (!workspaceFolders) {
+                vscode.window.showInformationMessage('No workspace folder is open.');
+                return;
+            }
+            foldersToExpand = workspaceFolders.map(folder => folder.uri);
+            vscode.window.showInformationMessage('Expanding all workspace folders...');
+        }
+
+        // ワークスペースルートを選択（ワークスペース全体の場合のみ）
+        if (!targetUri) {
+            await vscode.commands.executeCommand('list.selectAll');
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
 
         // キャンセル可能なプログレスバーを表示
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: "Expanding file explorer folders...",
+            title: targetUri ? "Expanding selected folder..." : "Expanding file explorer folders...",
             cancellable: true
         }, async (progress, token) => {
 
-            // 手法1: キーボードショートカットをシミュレート
             try {
-                await vscode.commands.executeCommand('workbench.files.action.collapseExplorerFolders');
-                await new Promise(resolve => setTimeout(resolve, 100));
-
-                // 各ワークスペースフォルダに対して展開を試行
-                for (let i = 0; i < workspaceFolders.length; i++) {
-                    if (token.isCancellationRequested) {
-                        vscode.window.showInformationMessage('Expansion cancelled by user.');
-                        return;
-                    }
-
-                    const folder = workspaceFolders[i];
-                    progress.report({ message: `Expanding workspace: ${folder.name}` });
-
-                    // フォルダにフォーカスしてから展開
-                    await vscode.commands.executeCommand('revealInExplorer', folder.uri);
+                // 全体をコラップスしてから始める（ワークスペース全体の場合のみ）
+                if (!targetUri) {
+                    await vscode.commands.executeCommand('workbench.files.action.collapseExplorerFolders');
                     await new Promise(resolve => setTimeout(resolve, 100));
-
-                    // 右矢印キーを送信して展開を試行
-                    await vscode.commands.executeCommand('list.expand');
-                    await new Promise(resolve => setTimeout(resolve, 50));
                 }
 
-                // 手法2: 各フォルダを個別に処理
-                for (const folder of workspaceFolders) {
+                // 各フォルダを個別に処理
+                for (const folder of foldersToExpand) {
                     if (token.isCancellationRequested) {
                         vscode.window.showInformationMessage('Expansion cancelled by user.');
                         return;
                     }
 
-                    progress.report({ message: `Recursively expanding: ${folder.name}` });
-                    await expandFolderRecursively(folder.uri, 0, token, progress);
+                    const folderName = targetUri ?
+                        vscode.workspace.asRelativePath(folder) :
+                        vscode.workspace.getWorkspaceFolder(folder)?.name || folder.path;
+
+                    progress.report({ message: `Recursively expanding: ${folderName}` });
+                    await expandFolderRecursively(folder, 0, token, progress);
                 }
 
                 if (!token.isCancellationRequested) {
