@@ -20,7 +20,7 @@ async function expandAllFolders(targetUri?: vscode.Uri, selectedUris?: vscode.Ur
     try {
         // まずエクスプローラーにフォーカス
         await vscode.commands.executeCommand('workbench.files.action.focusFilesExplorer');
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 100));
 
         // 対象フォルダを決定
         let foldersToExpand: vscode.Uri[] = [];
@@ -28,34 +28,12 @@ async function expandAllFolders(targetUri?: vscode.Uri, selectedUris?: vscode.Ur
         // 複数選択がある場合は優先的に使用
         if (selectedUris && selectedUris.length > 0) {
             // 複数選択されたフォルダを処理
-            for (const uri of selectedUris) {
-                try {
-                    const stat = await vscode.workspace.fs.stat(uri);
-                    if (stat.type === vscode.FileType.Directory) {
-                        foldersToExpand.push(uri);
-                    }
-                } catch (error) {
-                    console.log(`Could not access ${uri.path}: ${error}`);
-                }
-            }
-
-            if (foldersToExpand.length > 0) {
-                const folderNames = foldersToExpand.map(uri => vscode.workspace.asRelativePath(uri)).join(', ');
-                vscode.window.showInformationMessage(`Expanding ${foldersToExpand.length} selected folders: ${folderNames}`);
-            } else {
-                vscode.window.showErrorMessage('No valid folders found in selection.');
-                return;
-            }
+            foldersToExpand = selectedUris;
+            vscode.window.showInformationMessage(`Recursively expanding ${foldersToExpand.length} selected folders...`);
         } else if (targetUri) {
             // 単一フォルダが指定された場合
-            const stat = await vscode.workspace.fs.stat(targetUri);
-            if (stat.type === vscode.FileType.Directory) {
-                foldersToExpand = [targetUri];
-                vscode.window.showInformationMessage(`Expanding folder: ${vscode.workspace.asRelativePath(targetUri)}`);
-            } else {
-                vscode.window.showErrorMessage('Selected item is not a folder.');
-                return;
-            }
+            foldersToExpand = [targetUri];
+            vscode.window.showInformationMessage(`Recursively expanding folder: ${vscode.workspace.asRelativePath(targetUri)}`);
         } else {
             // コマンドパレットから実行された場合はワークスペース全体
             const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -64,48 +42,42 @@ async function expandAllFolders(targetUri?: vscode.Uri, selectedUris?: vscode.Ur
                 return;
             }
             foldersToExpand = workspaceFolders.map(folder => folder.uri);
-            vscode.window.showInformationMessage('Expanding all workspace folders...');
+            vscode.window.showInformationMessage('Recursively expanding all workspace folders...');
         }
 
-        // ワークスペースルートを選択（ワークスペース全体の場合のみ）
-        if (!targetUri && (!selectedUris || selectedUris.length === 0)) {
-            await vscode.commands.executeCommand('list.selectAll');
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
-
-        // キャンセル可能なプログレスバーを表示
+        // 再帰展開処理
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: (selectedUris && selectedUris.length > 0) ?
-                `Expanding ${selectedUris.length} selected folders...` :
-                targetUri ? "Expanding selected folder..." : "Expanding file explorer folders...",
+            title: "Recursively expanding folders...",
             cancellable: true
         }, async (progress, token) => {
-
             try {
                 // 全体をコラップスしてから始める（ワークスペース全体の場合のみ）
                 if (!targetUri && (!selectedUris || selectedUris.length === 0)) {
                     await vscode.commands.executeCommand('workbench.files.action.collapseExplorerFolders');
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    await new Promise(resolve => setTimeout(resolve, 50));
                 }
 
-                // 各フォルダを個別に処理
+                // バッチ処理
+                let processed = 0;
                 for (const folder of foldersToExpand) {
                     if (token.isCancellationRequested) {
                         vscode.window.showInformationMessage('Expansion cancelled by user.');
                         return;
                     }
 
-                    const folderName = (targetUri || (selectedUris && selectedUris.length > 0)) ?
-                        vscode.workspace.asRelativePath(folder) :
-                        vscode.workspace.getWorkspaceFolder(folder)?.name || folder.path;
+                    processed++;
+                    progress.report({
+                        message: `Processing ${processed}/${foldersToExpand.length}: ${vscode.workspace.asRelativePath(folder)}`,
+                        increment: (processed / foldersToExpand.length) * 100
+                    });
 
-                    progress.report({ message: `Recursively expanding: ${folderName}` });
-                    await expandFolderRecursively(folder, 0, token, progress);
+                    // フォルダを再帰的に展開
+                    await fastExpandFolder(folder, token);
                 }
 
                 if (!token.isCancellationRequested) {
-                    vscode.window.showInformationMessage('Folder expansion completed!');
+                    vscode.window.showInformationMessage(`Recursive expansion completed! All folders fully expanded.`);
                 }
 
             } catch (error) {
@@ -119,58 +91,58 @@ async function expandAllFolders(targetUri?: vscode.Uri, selectedUris?: vscode.Ur
 }
 
 /**
- * フォルダを再帰的に展開
+ * フォルダを再帰的に展開する
  */
-async function expandFolderRecursively(
-    folderUri: vscode.Uri,
-    depth: number,
-    token?: vscode.CancellationToken,
-    progress?: vscode.Progress<{ message?: string; increment?: number; }>
-): Promise<void> {
-    if ((token?.isCancellationRequested) || depth > 5) {
+async function fastExpandFolder(folderUri: vscode.Uri, token: vscode.CancellationToken): Promise<void> {
+    if (token.isCancellationRequested) {
         return;
     }
 
     try {
-        const stat = await vscode.workspace.fs.stat(folderUri);
-        if (stat.type !== vscode.FileType.Directory) {
-            return;
-        }
-
-        // フォルダをエクスプローラーで表示
+        // フォルダを選択
         await vscode.commands.executeCommand('revealInExplorer', folderUri);
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 30));
 
-        // 展開を試行
-        await vscode.commands.executeCommand('list.expand');
-        await new Promise(resolve => setTimeout(resolve, 50));
+        // 再帰展開を実行
+        await recursiveExpand(folderUri, token);
 
+    } catch (error) {
+        console.log(`Expand failed for ${folderUri.path}: ${error}`);
+    }
+}
+
+/**
+ * 再帰展開処理
+ */
+async function recursiveExpand(folderUri: vscode.Uri, token: vscode.CancellationToken): Promise<void> {
+    if (token.isCancellationRequested) {
+        return;
+    }
+
+    try {
         // サブフォルダを取得
         const entries = await vscode.workspace.fs.readDirectory(folderUri);
-        const subFolders = entries.filter(([name, type]) =>
-            type === vscode.FileType.Directory &&
-            !name.startsWith('.') &&
-            name !== 'node_modules'
-        );
+        const subFolders = entries
+            .filter(([name, type]) => type === vscode.FileType.Directory)
+            .map(([name]) => vscode.Uri.joinPath(folderUri, name));
 
-        // 各サブフォルダを再帰的に展開
-        for (const [name, type] of subFolders) {
-            if (token?.isCancellationRequested) {
+        // 現在のフォルダを展開
+        await vscode.commands.executeCommand('revealInExplorer', folderUri);
+        await new Promise(resolve => setTimeout(resolve, 15));
+        await vscode.commands.executeCommand('list.expand');
+        await new Promise(resolve => setTimeout(resolve, 15));
+
+        // サブフォルダを再帰的に展開
+        for (const subFolder of subFolders) {
+            if (token.isCancellationRequested) {
                 return;
             }
-
-            const subFolderUri = vscode.Uri.joinPath(folderUri, name);
-            const relativePath = vscode.workspace.asRelativePath(subFolderUri);
-
-            if (progress) {
-                progress.report({ message: `Expanding: ${relativePath}` });
-            }
-
-            await expandFolderRecursively(subFolderUri, depth + 1, token, progress);
+            await recursiveExpand(subFolder, token);
         }
 
     } catch (error) {
-        console.log(`Error expanding ${folderUri.path}: ${error}`);
+        // フォルダアクセスエラーは無視して続行
+        console.log(`Recursive expand failed for ${folderUri.path}: ${error}`);
     }
 }
 
