@@ -6,7 +6,7 @@
   "publisher": "MetroSoft-Application",
   "icon": "resources/icon.png",
   "engines": {
-    "vscode": "^0.10.1"
+    "vscode": "^1.74.0"
   },
   "repository": {
     "url": "https://github.com/MetroSoft-Application/file-explorer-expand-recursively"
