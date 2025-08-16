@@ -1,0 +1,80 @@
+{
+  "name": "file-explorer-expand-all",
+  "displayName": "File Explorer Expand All",
+  "description": "Recursively expand all folder nodes in VS Code file explorer",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "fileExplorer.expandAll",
+        "title": "Expand All Folders Recursively",
+        "icon": "$(expand-all)"
+      },
+      {
+        "command": "fileExplorer.showExpandedView",
+        "title": "Show Expanded File Tree",
+        "icon": "$(list-tree)"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "expandedFileTree",
+          "name": "Expanded File Tree",
+          "when": "expandedFileTreeEnabled"
+        }
+      ]
+    },
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "fileExplorer.expandAll",
+          "when": "explorerResourceIsFolder",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "fileExplorer.expandAll"
+        },
+        {
+          "command": "fileExplorer.showExpandedView"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "fileExplorer.showExpandedView",
+          "when": "view == expandedFileTree",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/mocha": "^10.0.3",
+    "@types/node": "18.x",
+    "@typescript-eslint/eslint-plugin": "^6.7.3",
+    "@typescript-eslint/parser": "^6.7.3",
+    "eslint": "^8.50.0",
+    "typescript": "^5.2.2",
+    "@vscode/test-cli": "^0.0.4",
+    "@vscode/test-electron": "^2.3.4"
+  }
+}
