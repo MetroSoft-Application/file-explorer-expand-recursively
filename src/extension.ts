@@ -3,9 +3,9 @@ import * as vscode from 'vscode';
 export function activate(context: vscode.ExtensionContext) {
     console.log('File Explorer Expand All extension is now active!');
 
-    // コマンドを登録（引数を受け取れるように修正）
-    let disposable = vscode.commands.registerCommand('fileExplorer.expandAll', async (uri?: vscode.Uri) => {
-        await expandAllFolders(uri);
+    // コマンドを登録（複数のURIを受け取れるように修正）
+    let disposable = vscode.commands.registerCommand('fileExplorer.expandAll', async (uri?: vscode.Uri, selectedUris?: vscode.Uri[]) => {
+        await expandAllFolders(uri, selectedUris);
     });
 
     context.subscriptions.push(disposable);
@@ -14,8 +14,9 @@ export function activate(context: vscode.ExtensionContext) {
 /**
  * すべてのフォルダを再帰的に展開する関数
  * @param targetUri 右クリックされたフォルダのURI（指定されない場合はワークスペース全体）
+ * @param selectedUris 複数選択されたフォルダのURI配列
  */
-async function expandAllFolders(targetUri?: vscode.Uri) {
+async function expandAllFolders(targetUri?: vscode.Uri, selectedUris?: vscode.Uri[]) {
     try {
         // まずエクスプローラーにフォーカス
         await vscode.commands.executeCommand('workbench.files.action.focusFilesExplorer');
@@ -24,8 +25,29 @@ async function expandAllFolders(targetUri?: vscode.Uri) {
         // 対象フォルダを決定
         let foldersToExpand: vscode.Uri[] = [];
 
-        if (targetUri) {
-            // 右クリックされたフォルダが指定された場合
+        // 複数選択がある場合は優先的に使用
+        if (selectedUris && selectedUris.length > 0) {
+            // 複数選択されたフォルダを処理
+            for (const uri of selectedUris) {
+                try {
+                    const stat = await vscode.workspace.fs.stat(uri);
+                    if (stat.type === vscode.FileType.Directory) {
+                        foldersToExpand.push(uri);
+                    }
+                } catch (error) {
+                    console.log(`Could not access ${uri.path}: ${error}`);
+                }
+            }
+
+            if (foldersToExpand.length > 0) {
+                const folderNames = foldersToExpand.map(uri => vscode.workspace.asRelativePath(uri)).join(', ');
+                vscode.window.showInformationMessage(`Expanding ${foldersToExpand.length} selected folders: ${folderNames}`);
+            } else {
+                vscode.window.showErrorMessage('No valid folders found in selection.');
+                return;
+            }
+        } else if (targetUri) {
+            // 単一フォルダが指定された場合
             const stat = await vscode.workspace.fs.stat(targetUri);
             if (stat.type === vscode.FileType.Directory) {
                 foldersToExpand = [targetUri];
@@ -46,7 +68,7 @@ async function expandAllFolders(targetUri?: vscode.Uri) {
         }
 
         // ワークスペースルートを選択（ワークスペース全体の場合のみ）
-        if (!targetUri) {
+        if (!targetUri && (!selectedUris || selectedUris.length === 0)) {
             await vscode.commands.executeCommand('list.selectAll');
             await new Promise(resolve => setTimeout(resolve, 100));
         }
@@ -54,13 +76,15 @@ async function expandAllFolders(targetUri?: vscode.Uri) {
         // キャンセル可能なプログレスバーを表示
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: targetUri ? "Expanding selected folder..." : "Expanding file explorer folders...",
+            title: (selectedUris && selectedUris.length > 0) ?
+                `Expanding ${selectedUris.length} selected folders...` :
+                targetUri ? "Expanding selected folder..." : "Expanding file explorer folders...",
             cancellable: true
         }, async (progress, token) => {
 
             try {
                 // 全体をコラップスしてから始める（ワークスペース全体の場合のみ）
-                if (!targetUri) {
+                if (!targetUri && (!selectedUris || selectedUris.length === 0)) {
                     await vscode.commands.executeCommand('workbench.files.action.collapseExplorerFolders');
                     await new Promise(resolve => setTimeout(resolve, 100));
                 }
@@ -72,7 +96,7 @@ async function expandAllFolders(targetUri?: vscode.Uri) {
                         return;
                     }
 
-                    const folderName = targetUri ?
+                    const folderName = (targetUri || (selectedUris && selectedUris.length > 0)) ?
                         vscode.workspace.asRelativePath(folder) :
                         vscode.workspace.getWorkspaceFolder(folder)?.name || folder.path;
 
@@ -88,6 +112,7 @@ async function expandAllFolders(targetUri?: vscode.Uri) {
                 vscode.window.showErrorMessage(`Error during expansion: ${error}`);
             }
         });
+
     } catch (error) {
         vscode.window.showErrorMessage(`Error: ${error}`);
     }
