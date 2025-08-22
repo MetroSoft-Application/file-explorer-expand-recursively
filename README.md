@@ -10,6 +10,7 @@ Recursively expand folder nodes in the file explorer tree view.
 - **Command Palette Support**: Access the expansion feature via Command Palette
 - **Cancellation Support**: Cancel the expansion process at any time
 - **High Performance**: Optimized for fast expansion with minimal UI blocking
+- **Configurable Exclusions**: Skip specified folders during expansion
 
 ## Usage
 
@@ -29,6 +30,26 @@ Recursively expand folder nodes in the file explorer tree view.
 3. All workspace folders will be expanded
 
 ![demo](./resources/demo.gif)
+
+## Configuration
+
+### Exclude Patterns
+
+You can configure which folders to exclude from recursive expansion:
+
+```json
+{
+  "fileExplorer.expandRecursively.excludePatterns": [
+    "custom_folder_to_exclude",
+    "another_folder",
+    "temp*"
+  ]
+}
+```
+
+**Pattern matching:**
+- Exact name matching (case-insensitive)
+- Simple glob patterns with `*` wildcard support
 
 ## Requirements
 

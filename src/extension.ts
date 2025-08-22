@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('File Explorer Expand All extension is now active!');
@@ -9,6 +10,37 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(disposable);
+}
+
+/**
+ * 設定から除外パターンを取得
+ */
+function getExcludePatterns(): string[] {
+    const config = vscode.workspace.getConfiguration('fileExplorer.expandRecursively');
+    const patterns = config.get<string[]>('excludePatterns') || [];
+    console.log('Exclude patterns from config:', patterns);
+    return patterns;
+}
+
+/**
+ * フォルダが除外パターンにマッチするかチェック
+ */
+function shouldExcludeFolder(folderName: string, excludePatterns: string[]): boolean {
+    const shouldExclude = excludePatterns.some(pattern => {
+        // 単純なグロブパターンのサポート
+        if (pattern.includes('*')) {
+            const regex = new RegExp(pattern.replace(/\*/g, '.*'), 'i');
+            return regex.test(folderName);
+        }
+        // 完全一致
+        return folderName.toLowerCase() === pattern.toLowerCase();
+    });
+
+    if (shouldExclude) {
+        console.log(`Excluding folder: ${folderName} (matches pattern)`);
+    }
+
+    return shouldExclude;
 }
 
 /**
@@ -99,6 +131,21 @@ async function fastExpandFolder(folderUri: vscode.Uri, token: vscode.Cancellatio
     }
 
     try {
+        // まずファイルかフォルダかを確認
+        const stat = await vscode.workspace.fs.stat(folderUri);
+        if (stat.type !== vscode.FileType.Directory) {
+            console.log(`Skipping ${folderUri.path}: not a directory`);
+            return;
+        }
+
+        // 除外パターンをチェック（フォルダ名のみ）
+        const folderName = path.basename(folderUri.path);
+        const excludePatterns = getExcludePatterns();
+        if (shouldExcludeFolder(folderName, excludePatterns)) {
+            console.log(`Skipping excluded folder: ${folderName}`);
+            return;
+        }
+
         // フォルダを選択
         await vscode.commands.executeCommand('revealInExplorer', folderUri);
         await new Promise(resolve => setTimeout(resolve, 30));
@@ -120,10 +167,30 @@ async function recursiveExpand(folderUri: vscode.Uri, token: vscode.Cancellation
     }
 
     try {
+        // フォルダかどうかを再度確認
+        const stat = await vscode.workspace.fs.stat(folderUri);
+        if (stat.type !== vscode.FileType.Directory) {
+            console.log(`Skipping ${folderUri.path}: not a directory`);
+            return;
+        }
+
         // サブフォルダを取得
         const entries = await vscode.workspace.fs.readDirectory(folderUri);
+        const excludePatterns = getExcludePatterns();
+
         const subFolders = entries
-            .filter(([name, type]) => type === vscode.FileType.Directory)
+            .filter(([name, type]) => {
+                if (type !== vscode.FileType.Directory) {
+                    return false;
+                }
+
+                // 除外パターンをチェック
+                if (shouldExcludeFolder(name, excludePatterns)) {
+                    return false;
+                }
+
+                return true;
+            })
             .map(([name]) => vscode.Uri.joinPath(folderUri, name));
 
         // 現在のフォルダを展開
@@ -141,8 +208,12 @@ async function recursiveExpand(folderUri: vscode.Uri, token: vscode.Cancellation
         }
 
     } catch (error) {
-        // フォルダアクセスエラーは無視して続行
-        console.log(`Recursive expand failed for ${folderUri.path}: ${error}`);
+        // より詳細なエラーログ
+        if (error instanceof vscode.FileSystemError) {
+            console.log(`FileSystem error for ${folderUri.path}: ${error.name} - ${error.message}`);
+        } else {
+            console.log(`Recursive expand failed for ${folderUri.path}: ${error}`);
+        }
     }
 }
 

@@ -2,7 +2,7 @@
   "name": "file-explorer-expand-recursively",
   "displayName": "File Explorer Expand Recursively",
   "description": "Recursively expand folder nodes in VS Code file explorer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "MetroSoft-Application",
   "icon": "resources/icon.png",
   "engines": {
@@ -73,6 +73,35 @@
           "group": "navigation"
         }
       ]
+    },
+    "configuration": {
+      "title": "File Explorer Expand Recursively",
+      "properties": {
+        "fileExplorer.expandRecursively.excludePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            ".git",
+            ".svn",
+            ".vs",
+            ".vscode",
+            ".cache",
+            "__pycache__",
+            "node_modules",
+            "dist",
+            "packages",
+            "build",
+            "target",
+            "Release",
+            "Debug",
+            "bin",
+            "obj"
+          ],
+          "description": "Patterns for folders to exclude from recursive expansion. Supports glob patterns."
+        }
+      }
     }
   },
   "scripts": {
