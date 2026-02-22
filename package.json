@@ -36,6 +36,11 @@
         "icon": "$(expand-all)"
       },
       {
+        "command": "fileExplorer.collapseRecursively",
+        "title": "Collapse Recursively",
+        "icon": "$(collapse-all)"
+      },
+      {
         "command": "fileExplorer.showExpandedView",
         "title": "Show Expanded File Tree",
         "icon": "$(list-tree)"
@@ -56,11 +61,19 @@
           "command": "fileExplorer.expandRecursively",
           "when": "explorerResourceIsFolder",
           "group": "navigation"
+        },
+        {
+          "command": "fileExplorer.collapseRecursively",
+          "when": "explorerResourceIsFolder",
+          "group": "navigation"
         }
       ],
       "commandPalette": [
         {
           "command": "fileExplorer.expandRecursively"
+        },
+        {
+          "command": "fileExplorer.collapseRecursively"
         },
         {
           "command": "fileExplorer.showExpandedView"
