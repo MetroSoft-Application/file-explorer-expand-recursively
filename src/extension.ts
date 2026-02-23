@@ -29,6 +29,8 @@ function getExcludePatterns(): string[] {
 
 /**
  * フォルダが除外パターンにマッチするかチェック
+ * @param folderName チェック対象のフォルダ名
+ * @param excludePatterns 除外パターンの配列
  */
 function shouldExcludeFolder(folderName: string, excludePatterns: string[]): boolean {
     const shouldExclude = excludePatterns.some(pattern => {
@@ -129,6 +131,8 @@ async function expandAllFolders(targetUri?: vscode.Uri, selectedUris?: vscode.Ur
 
 /**
  * フォルダを再帰的に展開する
+ * @param folderUri 展開対象フォルダのURI
+ * @param token キャンセルトークン
  */
 async function fastExpandFolder(folderUri: vscode.Uri, token: vscode.CancellationToken): Promise<void> {
     if (token.isCancellationRequested) {
@@ -165,6 +169,8 @@ async function fastExpandFolder(folderUri: vscode.Uri, token: vscode.Cancellatio
 
 /**
  * 再帰展開処理
+ * @param folderUri 展開対象フォルダのURI
+ * @param token キャンセルトークン
  */
 async function recursiveExpand(folderUri: vscode.Uri, token: vscode.CancellationToken): Promise<void> {
     if (token.isCancellationRequested) {
@@ -294,6 +300,8 @@ async function collapseAllFolders(targetUri?: vscode.Uri, selectedUris?: vscode.
 
 /**
  * フォルダを再帰的にコラップスする
+ * @param folderUri コラップス対象フォルダのURI
+ * @param token キャンセルトークン
  */
 async function fastCollapseFolder(folderUri: vscode.Uri, token: vscode.CancellationToken): Promise<void> {
     if (token.isCancellationRequested) {
@@ -322,6 +330,8 @@ async function fastCollapseFolder(folderUri: vscode.Uri, token: vscode.Cancellat
 
 /**
  * 再帰コラップス処理（サブフォルダを先にコラップスしてから親をコラップス）
+ * @param folderUri コラップス対象フォルダのURI
+ * @param token キャンセルトークン
  */
 async function recursiveCollapse(folderUri: vscode.Uri, token: vscode.CancellationToken): Promise<void> {
     if (token.isCancellationRequested) {
