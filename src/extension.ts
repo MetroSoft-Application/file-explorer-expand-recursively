@@ -267,6 +267,11 @@ async function collapseAllFolders(targetUri?: vscode.Uri, selectedUris?: vscode.
             cancellable: true
         }, async (progress, token) => {
             try {
+                if (token.isCancellationRequested) {
+                    vscode.window.showInformationMessage('Collapse cancelled by user.');
+                    return;
+                }
+
                 let processed = 0;
                 for (const folder of foldersToCollapse) {
                     if (token.isCancellationRequested) {
@@ -280,12 +285,11 @@ async function collapseAllFolders(targetUri?: vscode.Uri, selectedUris?: vscode.
                         increment: (processed / foldersToCollapse.length) * 100
                     });
 
-                    // フォルダを再帰的にコラップス
-                    await fastCollapseFolder(folder, token);
+                    await scopedCollapseFolder(folder, token);
                 }
 
                 if (!token.isCancellationRequested) {
-                    vscode.window.showInformationMessage(`Recursive collapse completed! All folders fully collapsed.`);
+                    vscode.window.showInformationMessage('Recursive collapse completed.');
                 }
 
             } catch (error) {
@@ -299,79 +303,59 @@ async function collapseAllFolders(targetUri?: vscode.Uri, selectedUris?: vscode.
 }
 
 /**
- * フォルダを再帰的にコラップスする
- * @param folderUri コラップス対象フォルダのURI
+ * 対象フォルダ配下のフォルダをボトムアップ順で収集する
+ * @param folderUri 起点フォルダ
+ * @param result 収集先
  * @param token キャンセルトークン
  */
-async function fastCollapseFolder(folderUri: vscode.Uri, token: vscode.CancellationToken): Promise<void> {
+async function collectFoldersPostOrder(
+    folderUri: vscode.Uri,
+    result: vscode.Uri[],
+    token: vscode.CancellationToken
+): Promise<void> {
     if (token.isCancellationRequested) {
         return;
     }
 
-    try {
-        // まずファイルかフォルダかを確認
-        const stat = await vscode.workspace.fs.stat(folderUri);
-        if (stat.type !== vscode.FileType.Directory) {
-            console.log(`Skipping ${folderUri.path}: not a directory`);
-            return;
-        }
-
-        // フォルダを選択
-        await vscode.commands.executeCommand('revealInExplorer', folderUri);
-        await new Promise(resolve => setTimeout(resolve, 30));
-
-        // 再帰コラップスを実行
-        await recursiveCollapse(folderUri, token);
-
-    } catch (error) {
-        console.log(`Collapse failed for ${folderUri.path}: ${error}`);
+    const stat = await vscode.workspace.fs.stat(folderUri);
+    if (stat.type !== vscode.FileType.Directory) {
+        return;
     }
+
+    const entries = await vscode.workspace.fs.readDirectory(folderUri);
+    const subFolders = entries
+        .filter(([, type]) => type === vscode.FileType.Directory)
+        .map(([name]) => vscode.Uri.joinPath(folderUri, name));
+
+    for (const subFolder of subFolders) {
+        await collectFoldersPostOrder(subFolder, result, token);
+    }
+
+    result.push(folderUri);
 }
 
 /**
- * 再帰コラップス処理（サブフォルダを先にコラップスしてから親をコラップス）
- * @param folderUri コラップス対象フォルダのURI
+ * 指定フォルダ配下のみを再帰的にコラップスする
+ * @param folderUri コラップス対象フォルダ
  * @param token キャンセルトークン
  */
-async function recursiveCollapse(folderUri: vscode.Uri, token: vscode.CancellationToken): Promise<void> {
-    if (token.isCancellationRequested) {
-        return;
-    }
-
+async function scopedCollapseFolder(folderUri: vscode.Uri, token: vscode.CancellationToken): Promise<void> {
     try {
-        const stat = await vscode.workspace.fs.stat(folderUri);
-        if (stat.type !== vscode.FileType.Directory) {
-            console.log(`Skipping ${folderUri.path}: not a directory`);
-            return;
-        }
+        const collapseOrder: vscode.Uri[] = [];
+        await collectFoldersPostOrder(folderUri, collapseOrder, token);
 
-        // サブフォルダを取得
-        const entries = await vscode.workspace.fs.readDirectory(folderUri);
-
-        const subFolders = entries
-            .filter(([, type]) => type === vscode.FileType.Directory)
-            .map(([name]) => vscode.Uri.joinPath(folderUri, name));
-
-        // サブフォルダを先に再帰的にコラップス（ボトムアップ）
-        for (const subFolder of subFolders) {
+        for (const folder of collapseOrder) {
             if (token.isCancellationRequested) {
                 return;
             }
-            await recursiveCollapse(subFolder, token);
+
+            await vscode.commands.executeCommand('revealInExplorer', folder);
+            await new Promise(resolve => setTimeout(resolve, 10));
+            await vscode.commands.executeCommand('list.collapse');
+            await new Promise(resolve => setTimeout(resolve, 10));
         }
-
-        // 現在のフォルダをコラップス
-        await vscode.commands.executeCommand('revealInExplorer', folderUri);
-        await new Promise(resolve => setTimeout(resolve, 15));
-        await vscode.commands.executeCommand('list.collapse');
-        await new Promise(resolve => setTimeout(resolve, 15));
-
     } catch (error) {
-        if (error instanceof vscode.FileSystemError) {
-            console.log(`FileSystem error for ${folderUri.path}: ${error.name} - ${error.message}`);
-        } else {
-            console.log(`Recursive collapse failed for ${folderUri.path}: ${error}`);
-        }
+        console.log(`Scoped collapse failed for ${folderUri.path}: ${error}`);
     }
 }
 
