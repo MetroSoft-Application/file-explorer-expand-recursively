@@ -2,7 +2,7 @@
   "name": "file-explorer-expand-recursively",
   "displayName": "File Explorer Expand Recursively",
   "description": "Recursively expand folder nodes in VS Code file explorer",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "publisher": "MetroSoft-Application",
   "icon": "resources/icon.png",
   "engines": {

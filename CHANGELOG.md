@@ -8,4 +8,8 @@
 
 ## [1.0.2]
 
-- Added `Collapse Recursively` command to recursively collapse folder nodes in the file explorer
+- Added`Collapse Recursively` command to recursively collapse folder nodes in the file explorer
+
+## [1.0.]
+
+- `Collapse Recursively` bug fix

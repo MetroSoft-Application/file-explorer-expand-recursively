@@ -30,6 +30,8 @@ Recursively expand or collapse folder nodes in the file explorer tree view.
 2. Type "Expand Recursively" and press Enter
 3. All workspace folders will be expanded
 
+![demo](./resources/demo.gif)
+
 ### Collapse Single Folder
 1. Right-click on any folder in the VS Code file explorer
 2. Select "Collapse Recursively" from the context menu
@@ -45,7 +47,6 @@ Recursively expand or collapse folder nodes in the file explorer tree view.
 2. Type "Collapse Recursively" and press Enter
 3. All workspace folders will be collapsed
 
-![demo](./resources/demo.gif)
 
 ## Configuration
 
